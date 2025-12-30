@@ -1,10 +1,12 @@
 import random
-from dungeon.mapgen import (make_empty_map, place_rooms, connect_rooms, carve_room,
-                            room_center, bfs_distance, all_floor_positions, EXIT)
-from dungeon.pathfinding import astar
-from config import (MAP_W, MAP_H, COIN_COUNT, POTION_COUNT, MONSTER_COUNT,
+from src.dungeon.mapgen import (make_empty_map, place_rooms, connect_rooms, carve_room,
+                            room_center, bfs_distance, all_floor_positions)
+from src.dungeon.constants import EXIT
+from src.dungeon.pathfinding import astar
+from src.config import (MAP_W, MAP_H, COIN_COUNT, POTION_COUNT, MONSTER_COUNT,
                     FLOOR_SCALING)
-from dungeon.entities import Player, Monster, derived_stats
+from src.dungeon.entities import Player, Monster
+from src.progress import derived_stats
 
 class Game:
     def __init__(self, progress):

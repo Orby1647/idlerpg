@@ -1,0 +1,6 @@
+WALL, FLOOR = "#", "."
+EXIT = "E"
+COIN = "$"
+POTION = "!"
+PLAYER = "@"
+MONSTER = "M"

@@ -1,14 +1,8 @@
 import random
 from collections import deque
-from ..config import ROOM_MIN, ROOM_MAX, ROOM_ATTEMPTS
-from .pathfinding import neighbors4
-
-WALL, FLOOR = "#", "."
-EXIT = "E"
-COIN = "$"
-POTION = "!"
-PLAYER = "@"
-MONSTER = "M"
+from src.config import ROOM_MIN, ROOM_MAX, ROOM_ATTEMPTS
+from src.dungeon.pathfinding import neighbors4
+from src.dungeon.constants import WALL, FLOOR
 
 def make_empty_map(w, h):
     return [[WALL for _ in range(w)] for _ in range(h)]

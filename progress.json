@@ -1,0 +1,16 @@
+{
+  "runs": 3,
+  "bank_gold": 160,
+  "upgrades": {
+    "hp": 6,
+    "atk": 2,
+    "def": 1,
+    "regen": 0
+  },
+  "base": {
+    "max_hp": 28,
+    "atk": 6,
+    "def": 1,
+    "regen": 0.0
+  }
+}

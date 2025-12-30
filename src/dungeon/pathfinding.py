@@ -1,5 +1,5 @@
 from heapq import heappop, heappush
-from mapgen import WALL
+from src.dungeon.constants import WALL
 
 def neighbors4(x, y, w, h):
     for dx, dy in [(1,0), (-1,0), (0,1), (0,-1)]:

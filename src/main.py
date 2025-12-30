@@ -3,11 +3,11 @@
 # Pure Python, cross-platform terminal. No external libraries required.
 
 import time, random
-from config import TICK_SPEEDS
-from render import draw
-from input import KeyReader
-from progress import load_progress, save_progress, apply_auto_upgrades, derived_stats
-from game import Game
+from src.config import TICK_SPEEDS
+from src.render import draw
+from src.input import KeyReader
+from src.progress import load_progress, save_progress, apply_auto_upgrades, derived_stats
+from src.game import Game
 
 
 def run_floor(progress):

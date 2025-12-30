@@ -1,5 +1,5 @@
 import sys
-from dungeon.mapgen import PLAYER, MONSTER, COIN, POTION, EXIT
+from src.dungeon.constants import PLAYER, MONSTER, COIN, POTION, EXIT
 
 def clear_screen():
     # Fast ANSI clear
