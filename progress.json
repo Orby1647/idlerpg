@@ -1,10 +1,10 @@
 {
-  "runs": 3,
-  "bank_gold": 160,
+  "runs": 6,
+  "bank_gold": 150,
   "upgrades": {
-    "hp": 6,
-    "atk": 2,
-    "def": 1,
+    "hp": 17,
+    "atk": 5,
+    "def": 3,
     "regen": 0
   },
   "base": {
