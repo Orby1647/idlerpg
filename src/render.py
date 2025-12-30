@@ -110,10 +110,10 @@ def draw_hud(game):
     print(up_text)
     print(controls)
 
-    if game.message:
-        print(f"Event: {game.message}")
-    else:
-        print("")
+def draw_event_log(game):
+    print("\nEvents:")
+    for entry in game.log:
+        print("  " + entry)
 
 
 # ----------------------------- FOOTER ------------------------------------
@@ -180,6 +180,7 @@ def draw(game):
 
     # Draw everything
     draw_hud(game)
+    draw_event_log(game)
     draw_grid(colored_grid)
     draw_footer(game)
 
