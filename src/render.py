@@ -45,7 +45,6 @@ def colorize_tile(ch, flash=False):
     color = TILE_COLORS.get(ch, RESET)
     return f"{color}{ch}{RESET}"
 
-
 def draw_grid(grid):
     for row in grid:
         out = []
@@ -71,7 +70,6 @@ def hp_bar(current, maximum, width=20):
         color = FG_RED + BOLD
 
     return f"{color}{'█' * filled}{RESET}{DIM}{'░' * empty}{RESET}"
-
 
 def draw_hud(game):
     """Render the HUD (stats, upgrades, messages)."""
@@ -144,7 +142,7 @@ def draw(game):
     for (x, y) in game.potions:
         grid[y][x] = POTION
     for (x, y), mon in game.monsters.items():
-        grid[y][x] = MONSTER
+        grid[y][x] = (MONSTER, mon.flash > 0)
 
     # Exit
     ex, ey = game.exit
@@ -152,9 +150,15 @@ def draw(game):
 
     # Player
     px, py = game.player.x, game.player.y
-    grid[py][px] = PLAYER
+    grid[py][px] = (PLAYER, game.player.flash > 0)
 
     # Draw everything
     draw_hud(game)
     draw_grid(grid)
     draw_footer(game)
+
+    if game.player.flash > 0: 
+        game.player.flash -= 1 
+    for mon in game.monsters.values(): 
+        if mon.flash > 0: 
+            mon.flash -= 1
