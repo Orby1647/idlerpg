@@ -21,6 +21,12 @@ TILE_COLORS = {
     POTION: FG_MAGENTA + BOLD,
     EXIT: FG_GREEN + BOLD,
 }
+def green(text):  return FG_GREEN + str(text) + RESET
+def red(text):    return FG_RED + str(text) + RESET
+def yellow(text): return FG_YELLOW + str(text) + RESET
+def cyan(text):   return FG_CYAN + str(text) + RESET
+def mag(text):    return FG_MAGENTA + str(text) + RESET
+def white(text):  return FG_WHITE + str(text) + RESET
 
 
 # ----------------------------- CLEAR SCREEN ------------------------------
@@ -33,17 +39,38 @@ def clear_screen():
 
 # ----------------------------- DRAW HELPERS ------------------------------
 
-def colorize_tile(ch: str) -> str:
-    """Return a colored version of a map tile."""
+def colorize_tile(ch, flash=False):
+    if flash:
+        return f"{FG_RED}{BOLD}{ch}{RESET}"
     color = TILE_COLORS.get(ch, RESET)
     return f"{color}{ch}{RESET}"
 
 
 def draw_grid(grid):
-    """Render the dungeon grid with colors."""
     for row in grid:
-        colored_row = (colorize_tile(ch) for ch in row)
-        print("".join(colored_row))
+        out = []
+        for cell in row:
+            if isinstance(cell, tuple):
+                ch, flash = cell
+                out.append(colorize_tile(ch, flash))
+            else:
+                out.append(colorize_tile(cell))
+        print("".join(out))
+
+def hp_bar(current, maximum, width=20):
+    ratio = current / maximum
+    filled = int(ratio * width)
+    empty = width - filled
+
+    # Color transitions
+    if ratio > 0.6:
+        color = FG_GREEN
+    elif ratio > 0.3:
+        color = FG_YELLOW
+    else:
+        color = FG_RED + BOLD
+
+    return f"{color}{'█' * filled}{RESET}{DIM}{'░' * empty}{RESET}"
 
 
 def draw_hud(game):
@@ -52,22 +79,30 @@ def draw_hud(game):
     upgrades = game.progress["upgrades"]
 
     status = (
-        f"Idle Roguelite  |  Floor {game.floor}  |  "
-        f"Speed: {game.speed_mode} {'(PAUSED)' if game.paused else ''}"
+        f"Idle Roguelite  |  Floor {cyan(game.floor)}  |  "
+        f"Speed: {yellow(game.speed_mode)} {red('(PAUSED)') if game.paused else ''}"
+    )
+
+    hpbar = hp_bar(p.hp, p.max_hp)
+
+    hp_color = ( 
+        green(p.hp) if p.hp > p.max_hp * 0.6 else 
+        yellow(p.hp) if p.hp > p.max_hp * 0.3 else 
+        red(p.hp) 
     )
 
     stats = (
-        f"HP {p.hp}/{p.max_hp}  "
-        f"ATK {p.atk}  DEF {p.df}  "
-        f"Regen {p.regen:.2f}/tick  "
-        f"Gold {p.gold}  Kills {p.kills}"
+        f"HP {hp_color}/{green(p.max_hp)}  {hpbar}  "
+        f"ATK {yellow(p.atk)}  DEF {cyan(p.df)}  "
+        f"Regen {mag(f'{p.regen:.2f}')}/tick  "
+        f"Gold {yellow(p.gold)}  Kills {red(p.kills)}"
     )
 
     up_text = (
-        f"Upgrades: HP+{upgrades['hp']}  "
-        f"ATK+{upgrades['atk']}  "
-        f"DEF+{upgrades['def']}  "
-        f"Regen+{upgrades['regen']}"
+        f"Upgrades: HP+{green(upgrades['hp'])}  "
+        f"ATK+{yellow(upgrades['atk'])}  "
+        f"DEF+{cyan(upgrades['def'])}  "
+        f"Regen+{mag(upgrades['regen'])}"
     )
 
     controls = "Controls: P pause/resume | 1/2/3 speed | Q quit"

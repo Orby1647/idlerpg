@@ -7,6 +7,7 @@ class Entity:
         self.max_hp = hp
         self.atk = atk
         self.df = df
+        self.flash = 0
 
     def is_alive(self):
         return self.hp > 0

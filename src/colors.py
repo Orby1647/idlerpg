@@ -1,4 +1,4 @@
-# src/colors.py
+
 
 RESET = "\033[0m"
 

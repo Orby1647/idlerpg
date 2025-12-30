@@ -138,11 +138,13 @@ class Game:
             dmg_p = int(dmg_p * 1.5)
             self.message = "Critical hit!"
         m.hp -= dmg_p
+        m.flash = 2
 
         # Monster attacks if alive
         if m.hp > 0:
             dmg_m = max(1, m.atk - p.df)
             p.hp -= dmg_m
+            p.flash = 2
 
     def is_over(self):
         return not self.player.is_alive() or (self.player.x, self.player.y) == self.exit
