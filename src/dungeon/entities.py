@@ -31,3 +31,8 @@ class Player(Entity):
 
 class Monster(Entity):
     pass
+
+class Boss(Monster):
+    def __init__(self, x, y, hp, atk, df):
+        super().__init__(x, y, hp, atk, df)
+        self.is_boss = True

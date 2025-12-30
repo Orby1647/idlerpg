@@ -1,7 +1,7 @@
 import random
 from src.dungeon.mapgen import (make_empty_map, place_rooms, connect_rooms, carve_room,
                             room_center, bfs_distance, all_floor_positions)
-from src.dungeon.constants import EXIT, WALL
+from src.dungeon.constants import EXIT, WALL, LOCKED_EXIT
 from src.dungeon.pathfinding import astar
 from src.config import (MAP_W, MAP_H, COIN_COUNT, POTION_COUNT, MONSTER_COUNT,
                     FLOOR_SCALING)
@@ -76,6 +76,8 @@ class Game:
         max_hp, atk, df, regen = derived_stats(self.progress)
         self.grid = make_empty_map(MAP_W, MAP_H)
         rooms = place_rooms(self.grid)
+        is_boss_floor = (self.floor % 5 == 0)
+        self.exit_locked = is_boss_floor
         if not rooms:
             # ensure at least one room
             carve_room(self.grid, 2, 2, 8, 6)
@@ -92,7 +94,7 @@ class Game:
         far = max(dist.items(), key=lambda kv: kv[1])[0]
         self.exit = far
         ex, ey = self.exit
-        self.grid[ey][ex] = EXIT
+        self.grid[ey][ex] = LOCKED_EXIT if is_boss_floor else EXIT
 
         # Place coins
         open_tiles = [p for p in floors if p != (sx, sy) and p != self.exit]
@@ -107,8 +109,24 @@ class Game:
         mons_tiles = [p for p in open_tiles[COIN_COUNT+POTION_COUNT:
                                             COIN_COUNT+POTION_COUNT+MONSTER_COUNT]]
         self.monsters = {}
+
+        if is_boss_floor:
+            # Place a single boss monster
+            mx, my = mons_tiles[0]
+            hp = int(50 * (1.2 ** (self.floor // 5)))  # scale boss HP
+            atk = int(10 * (1.1 ** (self.floor // 5)))
+            df  = int(5 * (1.1 ** (self.floor // 5)))
+            boss = Monster(mx, my, hp, atk, df)
+            boss.is_boss = True
+            self.monsters[(mx, my)] = boss
+        else:
+            # Regular monsters
+            pass
+
         mscale = 1.0 + (self.floor-1) * (0.15 * FLOORSCALE())  # mild scaling
         for (mx, my) in mons_tiles:
+            if is_boss_floor and (mx, my) in self.monsters:
+                continue  # skip boss tile
             hp = int(12 * mscale + random.randint(-2, 2))
             atk = int(4 * mscale + random.randint(0, 2))
             df  = int(1 * mscale + random.randint(0, 1))
@@ -121,70 +139,83 @@ class Game:
     def tick(self):
         if self.paused:
             return
-        # regen
         self.player.tick_regen()
-        # If fighting, resolve one combat round
-        if self.fighting:
-            mpos = self.fighting
-            mon = self.monsters.get(mpos)
-            if mon and mon.is_alive() and self.player.is_alive():
-                self._combat_round(self.player, mon)
-                if not mon.is_alive():
-                    self.player.kills += 1
-                    # drop small gold
-                    self.player.gold += random.randint(2, 5)
-                    del self.monsters[mpos]
-                    self.fighting = None
-                    self.log_event(f"Defeated monster at {mpos}")
-            # If player died
-            if not self.player.is_alive():
+        if self._handle_combat():
+            return
+        ppos = (self.player.x, self.player.y)
+        if self._handle_pickups(ppos):
+            return
+        if ppos == self.exit:
+            if self.exit_locked:
+                self.log_event("The exit is locked! Defeat the boss to unlock.")
                 return
             return
+        targets = self._choose_targets()
+        self._move_along_path(ppos, targets)
+        self.compute_visibility()
 
-        # If standing on coin/potion, collect/use
-        ppos = (self.player.x, self.player.y)
+    def _handle_pickups(self, ppos):
+        picked = False
         if ppos in self.coins:
             self.coins.remove(ppos)
-            g = random.randint(3, 8)
-            self.player.gold += g
-            self.log_event(f"Collected {g} gold")
+            self.player.gold += 1
+            self.log_event("Picked up a coin!")
+            picked = True
         if ppos in self.potions:
             self.potions.remove(ppos)
-            heal = random.randint(8, 16)
-            self.player.hp = min(self.player.max_hp, self.player.hp + heal)
-            self.log_event(f"Drank potion (+{heal} HP)")
+            heal_amount = min(10, self.player.max_hp - self.player.hp)
+            self.player.hp += heal_amount
+            self.log_event(f"Drank a potion! Restored {heal_amount} HP.")
+            picked = True
+        return picked
+    
+    def _handle_combat(self):
+        if self.fighting:
+            mx, my = self.fighting
+            monster = self.monsters.get((mx, my))
+            if monster and monster.is_alive():
+                self._combat_round(self.player, monster)
+                if not monster.is_alive():
+                    del self.monsters[(mx, my)]
+                    self.player.kills += 1
+                    if getattr(monster, "is_boss", False):
+                        self.exit_locked = False
+                        self.log_event("Boss defeated! The exit is now unlocked.")
+                        ex, ey = self.exit
+                        self.grid[ey][ex] = EXIT
+                    else:
+                        self.log_event("Monster defeated!")
+                return True
+            else:
+                self.fighting = None
+        return False
+    
+    def _choose_targets(self):
+        """Return a list of target tiles based on player state."""
+        low_hp = self.player.hp <= int(self.player.max_hp * 0.35)
+        if low_hp and self.potions:
+            return list(self.potions)
+        if self.coins:
+            return list(self.coins)
+        return [self.exit]
 
-        # If reached exit, finish run
-        if ppos == self.exit:
-            return
-
-        # Decide next target: prioritize potion if low, else coin, else exit
-        targets = []
-        if self.player.hp <= int(self.player.max_hp * 0.35) and self.potions:
-            targets = list(self.potions)
-        elif self.coins:
-            targets = list(self.coins)
-        else:
-            targets = [self.exit]
-
-        # Compute path; monsters are passable but will trigger combat if stepped into
-        blocked = set()  # could add traps, etc.
+    def _move_along_path(self, ppos, targets):
+        blocked = set()  # future: traps, locked doors, hazards
         path = astar(self.grid, ppos, targets, blocked=blocked)
         self.path = path
-
-        # Move one step along path
-        if path and len(path) > 1:
-            nx, ny = path[1]
-            # If moving into a monster tile, start combat
-            if (nx, ny) in self.monsters:
-                self.fighting = (nx, ny)
-                self.log_event("Encounter!")
-            else:
-                self.player.x, self.player.y = nx, ny
-        else:
-            # No path found (rare) -> idle
+        if not path or len(path) <= 1:
             self.log_event("No path")
-        self.compute_visibility()
+            return
+        nx, ny = path[1]
+        if (nx, ny) in self.monsters:
+            self.fighting = (nx, ny)
+            mon = self.monsters[(nx, ny)]
+            if getattr(mon, "is_boss", False):
+                self.log_event("A boss appears!")
+            else:
+                self.log_event("Encounter!")
+            return
+        self.player.x, self.player.y = nx, ny
 
     def _combat_round(self, p, m):
         # Player attacks

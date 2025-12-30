@@ -6,7 +6,7 @@ from src.colors import (
     FG_RED, FG_GREEN, FG_YELLOW, FG_CYAN, FG_MAGENTA, FG_WHITE
 )
 from src.dungeon.constants import (
-    WALL, FLOOR, EXIT, COIN, POTION, PLAYER, MONSTER
+    WALL, FLOOR, EXIT, COIN, POTION, PLAYER, MONSTER, BOSS, LOCKED_EXIT
 )
 
 # ----------------------------- COLOR HELPERS ------------------------------
@@ -19,6 +19,8 @@ TILE_COLORS = {
     COIN: FG_YELLOW + BOLD,
     POTION: FG_MAGENTA + BOLD,
     EXIT: FG_GREEN + BOLD,
+    BOSS: FG_MAGENTA + BOLD,
+    LOCKED_EXIT: FG_RED + BOLD,
 }
 
 def green(t):  return FG_GREEN + str(t) + RESET
@@ -158,7 +160,10 @@ def draw(game):
 
     # Monsters
     for (x, y), mon in game.monsters.items():
-        fog_grid[y][x][0] = MONSTER
+        if getattr(mon, "is_boss", False):
+            fog_grid[y][x][0] = BOSS
+        else:
+            fog_grid[y][x][0] = MONSTER
         fog_grid[y][x][3] = mon.flash > 0
 
     # Exit
