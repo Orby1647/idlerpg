@@ -233,10 +233,17 @@ class Game:
             p.flash = 2
 
     def is_over(self):
-        return not self.player.is_alive() or (self.player.x, self.player.y) == self.exit
+        if not self.player.is_alive():
+            return True 
+        at_exit = (self.player.x, self.player.y) == self.exit
+        if at_exit and not self.exit_locked:
+            return True
+        return False
 
     def result(self):
-        if (self.player.x, self.player.y) == self.exit:
+        at_exit = (self.player.x, self.player.y) == self.exit
+        exit_unlocked = not getattr(self, "exit_locked", False)
+        if at_exit and exit_unlocked:
             return "escaped"
         elif not self.player.is_alive():
             return "dead"
