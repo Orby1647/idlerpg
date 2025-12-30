@@ -9,8 +9,7 @@ from src.dungeon.constants import (
     WALL, FLOOR, EXIT, COIN, POTION, PLAYER, MONSTER
 )
 
-
-# ----------------------------- COLOR MAP ---------------------------------
+# ----------------------------- COLOR HELPERS ------------------------------
 
 TILE_COLORS = {
     WALL: FG_WHITE + DIM,
@@ -21,47 +20,46 @@ TILE_COLORS = {
     POTION: FG_MAGENTA + BOLD,
     EXIT: FG_GREEN + BOLD,
 }
-def green(text):  return FG_GREEN + str(text) + RESET
-def red(text):    return FG_RED + str(text) + RESET
-def yellow(text): return FG_YELLOW + str(text) + RESET
-def cyan(text):   return FG_CYAN + str(text) + RESET
-def mag(text):    return FG_MAGENTA + str(text) + RESET
-def white(text):  return FG_WHITE + str(text) + RESET
+
+def green(t):  return FG_GREEN + str(t) + RESET
+def red(t):    return FG_RED + str(t) + RESET
+def yellow(t): return FG_YELLOW + str(t) + RESET
+def cyan(t):   return FG_CYAN + str(t) + RESET
+def mag(t):    return FG_MAGENTA + str(t) + RESET
+def white(t):  return FG_WHITE + str(t) + RESET
 
 
 # ----------------------------- CLEAR SCREEN ------------------------------
 
 def clear_screen():
-    """Clear the terminal using ANSI escape codes."""
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.flush()
 
 
-# ----------------------------- DRAW HELPERS ------------------------------
+# ----------------------------- TILE COLORING ------------------------------
 
-def colorize_tile(ch, flash=False):
+def colorize_tile(ch, visible=False, explored=False, flash=False):
+    """Return the correct colored tile based on fog + flash."""
+    if not explored:
+        return " "  # completely unseen
+
+    if not visible:
+        return FG_WHITE + DIM + ch + RESET  # explored but not visible
+
     if flash:
-        return f"{FG_RED}{BOLD}{ch}{RESET}"
+        return FG_RED + BOLD + ch + RESET
+
     color = TILE_COLORS.get(ch, RESET)
     return f"{color}{ch}{RESET}"
 
-def draw_grid(grid):
-    for row in grid:
-        out = []
-        for cell in row:
-            if isinstance(cell, tuple):
-                ch, flash = cell
-                out.append(colorize_tile(ch, flash))
-            else:
-                out.append(colorize_tile(cell))
-        print("".join(out))
+
+# ----------------------------- HP BAR ------------------------------------
 
 def hp_bar(current, maximum, width=20):
     ratio = current / maximum
     filled = int(ratio * width)
     empty = width - filled
 
-    # Color transitions
     if ratio > 0.6:
         color = FG_GREEN
     elif ratio > 0.3:
@@ -71,8 +69,10 @@ def hp_bar(current, maximum, width=20):
 
     return f"{color}{'█' * filled}{RESET}{DIM}{'░' * empty}{RESET}"
 
+
+# ----------------------------- HUD ---------------------------------------
+
 def draw_hud(game):
-    """Render the HUD (stats, upgrades, messages)."""
     p = game.player
     upgrades = game.progress["upgrades"]
 
@@ -83,10 +83,10 @@ def draw_hud(game):
 
     hpbar = hp_bar(p.hp, p.max_hp)
 
-    hp_color = ( 
-        green(p.hp) if p.hp > p.max_hp * 0.6 else 
-        yellow(p.hp) if p.hp > p.max_hp * 0.3 else 
-        red(p.hp) 
+    hp_color = (
+        green(p.hp) if p.hp > p.max_hp * 0.6 else
+        yellow(p.hp) if p.hp > p.max_hp * 0.3 else
+        red(p.hp)
     )
 
     stats = (
@@ -116,8 +116,9 @@ def draw_hud(game):
         print("")
 
 
+# ----------------------------- FOOTER ------------------------------------
+
 def draw_footer(game):
-    """Render the footer showing run status."""
     res = game.result()
     if res == "running":
         print("\nWatching the runner...")
@@ -127,38 +128,64 @@ def draw_footer(game):
         print("\n🚪 The runner escaped! Gold banked.")
 
 
+# ----------------------------- GRID RENDER --------------------------------
+
+def draw_grid(grid):
+    for row in grid:
+        print("".join(row))
+
+
 # ----------------------------- MAIN DRAW ---------------------------------
 
 def draw(game):
-    """Full render pass: HUD + map + footer."""
     clear_screen()
 
-    # Copy grid so we can overlay items
-    grid = [row[:] for row in game.grid]
+    # Build fog-aware grid
+    fog_grid = []
+    for y, row in enumerate(game.grid):
+        fog_row = []
+        for x, ch in enumerate(row):
+            visible = (x, y) in game.visible
+            explored = (x, y) in game.explored
+            fog_row.append([ch, visible, explored, False])  # flash=False for now
+        fog_grid.append(fog_row)
 
     # Overlay items
     for (x, y) in game.coins:
-        grid[y][x] = COIN
+        fog_grid[y][x][0] = COIN
     for (x, y) in game.potions:
-        grid[y][x] = POTION
+        fog_grid[y][x][0] = POTION
+
+    # Monsters
     for (x, y), mon in game.monsters.items():
-        grid[y][x] = (MONSTER, mon.flash > 0)
+        fog_grid[y][x][0] = MONSTER
+        fog_grid[y][x][3] = mon.flash > 0
 
     # Exit
     ex, ey = game.exit
-    grid[ey][ex] = EXIT
+    fog_grid[ey][ex][0] = EXIT
 
     # Player
     px, py = game.player.x, game.player.y
-    grid[py][px] = (PLAYER, game.player.flash > 0)
+    fog_grid[py][px][0] = PLAYER
+    fog_grid[py][px][3] = game.player.flash > 0
+
+    # Convert fog grid to colored strings
+    colored_grid = []
+    for row in fog_grid:
+        out = []
+        for ch, visible, explored, flash in row:
+            out.append(colorize_tile(ch, visible, explored, flash))
+        colored_grid.append(out)
 
     # Draw everything
     draw_hud(game)
-    draw_grid(grid)
+    draw_grid(colored_grid)
     draw_footer(game)
 
-    if game.player.flash > 0: 
-        game.player.flash -= 1 
-    for mon in game.monsters.values(): 
-        if mon.flash > 0: 
+    # Decrement flash AFTER drawing
+    if game.player.flash > 0:
+        game.player.flash -= 1
+    for mon in game.monsters.values():
+        if mon.flash > 0:
             mon.flash -= 1

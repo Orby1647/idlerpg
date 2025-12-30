@@ -16,6 +16,22 @@ class Game:
         self.paused = False
         self.message = ""
         self._build_floor()
+        self.visible = set()
+        self.explored = set()
+        self.height = len(self.grid)
+        self.width = len(self.grid[0])
+
+    def compute_visibility(self, radius=8):
+        px, py = self.player.x, self.player.y
+        self.visible.clear()
+        for y in range(py - radius, py + radius + 1):
+            for x in range(px - radius, px + radius + 1):
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    dx = x - px
+                    dy = y - py
+                    if dx*dx + dy*dy <= radius*radius:
+                        self.visible.add((x, y))
+                        self.explored.add((x, y))
 
     def _build_floor(self):
         # Stats from upgrades
@@ -130,6 +146,7 @@ class Game:
         else:
             # No path found (rare) -> idle
             self.message = "No path"
+        self.compute_visibility()
 
     def _combat_round(self, p, m):
         # Player attacks
