@@ -125,7 +125,7 @@ def draw_footer(game):
     if res == "running":
         print("\nWatching the runner...")
     elif res == "dead":
-        print("\n💀 The runner died! Gold banked.")
+        print("\n💀 The runner died!")
     elif res == "escaped":
         print("\n🚪 The runner escaped! Gold banked.")
 
