@@ -2,7 +2,7 @@
 # Idle Roguelite — watch a player auto-run dungeons with meta progression.
 # Pure Python, cross-platform terminal. No external libraries required.
 
-import time, random
+import time, random, os
 from src.config import TICK_SPEEDS
 from src.render import draw
 from src.input import KeyReader
@@ -16,10 +16,19 @@ def run_floor(progress):
         while True:
             draw(game)
             if game.is_over():
-                # Bank the gold and mark run
-                progress["bank_gold"] += game.player.gold
-                progress["runs"] += 1
-                break
+                result = game.result()
+                if result == "dead":
+                    game.log_event("💀 The runner has died!")
+                    try:
+                        os.remove("progress.json")
+                    except FileNotFoundError:
+                        pass
+                    return False  # floor over, do not continue
+                elif result == "escaped":
+                    game.log_event("🚪 The runner has escaped the floor!")
+                    progress["bank_gold"] += game.player.gold
+                    progress["runs"] += 1
+                    return True  # floor over, continue to next floor
             # Input
             key = kr.read_key()
             if key:

@@ -15,12 +15,14 @@ class Game:
         self.speed_mode = "normal"
         self.paused = False
         self.message = ""
+        self.player = Player(0, 0, max_hp=28, atk=6, df=2, regen=.1) # temp init
         self._build_floor()
         self.visible = set()
         self.explored = set()
         self.height = len(self.grid)
         self.width = len(self.grid[0])
         self.log = []
+        
 
     def log_event(self, msg):
         self.log.append(msg)
@@ -85,10 +87,16 @@ class Game:
         connect_rooms(self.grid, rooms)
         floors = all_floor_positions(self.grid)
 
+        max_hp, atk, df, regen = derived_stats(self.progress)
+        hp_ratio = self.player.hp / self.player.max_hp if self.player.max_hp > 0 else 1.0
+        self.player.max_hp = max_hp
+        self.player.atk = atk
+        self.player.df = df
+        self.player.regen = regen
+        self.player.hp = int(self.player.max_hp * hp_ratio)
         # Player spawn at center of first room
         sx, sy = room_center(rooms[0])
-        self.player = Player(sx, sy, max_hp, atk, df, regen)
-
+        self.player.x, self.player.y = sx, sy
         # Exit at farthest reachable floor tile
         dist = bfs_distance(self.grid, (sx, sy))
         far = max(dist.items(), key=lambda kv: kv[1])[0]
@@ -113,9 +121,9 @@ class Game:
         if is_boss_floor:
             # Place a single boss monster
             mx, my = mons_tiles[0]
-            hp = int(50 * (1.2 ** (self.floor // 5)))  # scale boss HP
-            atk = int(10 * (1.1 ** (self.floor // 5)))
-            df  = int(5 * (1.1 ** (self.floor // 5)))
+            hp = int(40 * (1.15 ** (self.floor // 5)))  # scale boss HP
+            atk = int(5 * (1.1 ** (self.floor // 5)))
+            df  = int(2 * (1.1 ** (self.floor // 5)))
             boss = Monster(mx, my, hp, atk, df)
             boss.is_boss = True
             self.monsters[(mx, my)] = boss
@@ -158,8 +166,9 @@ class Game:
         picked = False
         if ppos in self.coins:
             self.coins.remove(ppos)
-            self.player.gold += 1
-            self.log_event("Picked up a coin!")
+            gold = random.randint(2, 5)
+            self.player.gold += gold
+            self.log_event(f"Picked up {gold} coins!")
             picked = True
         if ppos in self.potions:
             self.potions.remove(ppos)
@@ -192,12 +201,24 @@ class Game:
     
     def _choose_targets(self):
         """Return a list of target tiles based on player state."""
+
+        # If the exit is locked, the boss is the priority
+        if getattr(self, "exit_locked", False):
+            boss_pos = self._boss_position()
+            if boss_pos:
+                return [boss_pos]
+
+        # Normal behavior
         low_hp = self.player.hp <= int(self.player.max_hp * 0.35)
+
         if low_hp and self.potions:
             return list(self.potions)
+
         if self.coins:
             return list(self.coins)
+
         return [self.exit]
+
 
     def _move_along_path(self, ppos, targets):
         blocked = set()  # future: traps, locked doors, hazards
@@ -216,6 +237,12 @@ class Game:
                 self.log_event("Encounter!")
             return
         self.player.x, self.player.y = nx, ny
+
+    def _boss_position(self):
+        for pos, mon in self.monsters.items():
+            if getattr(mon, "is_boss", False):
+                return pos
+        return None
 
     def _combat_round(self, p, m):
         # Player attacks
